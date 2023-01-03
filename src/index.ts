@@ -2,6 +2,7 @@ import { ApolloServer } from "apollo-server";
 import { DateTimeResolver } from "graphql-scalars";
 import { Context, context } from "./context";
 import { ApolloServerPluginLandingPageGraphQLPlayground } from "apollo-server-core";
+import { prisma, User } from "@prisma/client";
 
 const typeDefs = `
 type Query {
@@ -42,10 +43,10 @@ scalar DateTime
 const resolvers = {
   Query: {
     allUsers: (_parent, _args, context: Context) => {
-      // TODO
+      return context.prisma.user.findMany()
     },
     postById: (_parent, args: { id: number }, context: Context) => {
-      // TODO
+      return context.prisma.post.findFirst({ where: { id: args.id } })
     },
     feed: (
       _parent,
@@ -56,10 +57,11 @@ const resolvers = {
       },
       context: Context
     ) => {
-      // TODO
+      const { skip, take, searchString } = args
+      return context.prisma.post.findMany({ where: { title: { contains: searchString } }, skip, take })
     },
     draftsByUser: (_parent, args: { id: number }, context: Context) => {
-      // TODO
+      return context.prisma.user.findUnique({ where: { id: args.id }}).posts({ where: { published: false } })
     },
   },
   Mutation: {
@@ -68,34 +70,35 @@ const resolvers = {
       args: { name: string | undefined; email: string },
       context: Context
     ) => {
-      // TODO
+      return context.prisma.user.create({ data: { name: args.name, email: args.email } })
     },
     createDraft: (
       _parent,
       args: { title: string; content: string | undefined; authorEmail: string },
       context: Context
     ) => {
-      // TODO
+      const { title, content, authorEmail } = args
+      return context.prisma.post.create({ data: { title, content, author: { connect: { email: authorEmail } }, published: false } })
     },
     incrementPostViewCount: (
       _parent,
       args: { id: number },
       context: Context
     ) => {
-      // TODO
+      return context.prisma.post.update({ where: { id: args.id }, data: { viewCount: { increment: 1 } } })
     },
     deletePost: (_parent, args: { id: number }, context: Context) => {
-      // TODO
+      return context.prisma.post.delete({ where: { id: args.id } })
     },
   },
   Post: {
     author: (parent, _args, context: Context) => {
-      return null;
+      return context.prisma.post.findUnique({ where: { id: parent.id } }).author();
     },
   },
   User: {
-    posts: (parent, _args, context: Context) => {
-      return [];
+    posts: (parent: User, _args, context: Context) => {
+      return context.prisma.user.findUnique({ where: { id: parent.id } }).posts();
     },
   },
   DateTime: DateTimeResolver,
